@@ -1,4 +1,4 @@
-package com.github.glfrazier.obscanvarranger;
+package com.github.glfrazier.canvasarranger;
 
 import javax.json.Json;
 import javax.json.JsonObject;

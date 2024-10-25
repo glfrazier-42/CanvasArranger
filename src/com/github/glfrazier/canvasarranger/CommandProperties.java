@@ -1,4 +1,4 @@
-package com.github.glfrazier.obscanvarranger;
+package com.github.glfrazier.canvasarranger;
 
 import java.io.FileInputStream;
 import java.io.IOException;

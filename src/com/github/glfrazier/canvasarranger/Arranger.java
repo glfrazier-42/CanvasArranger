@@ -1,4 +1,4 @@
-package com.github.glfrazier.obscanvarranger;
+package com.github.glfrazier.canvasarranger;
 
 import static java.lang.Math.max;
 
