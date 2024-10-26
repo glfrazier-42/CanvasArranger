@@ -4,6 +4,7 @@ import static java.lang.Math.max;
 
 import java.awt.Point;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -11,6 +12,8 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.SortedSet;
+import java.util.TreeSet;
 
 public class Arranger {
 
@@ -30,12 +33,10 @@ public class Arranger {
 
 	private void buildHierarchy(Anode root, Map<String, Node> nodes, Map<String, Edge> edges, Set<Edge> edgeSet,
 			Map<Node, Anode> nodeMap) {
-		System.out.println("Building the hierarchy from " + root);
 		List<Anode> nodesToProcess = new LinkedList<>();
 		nodesToProcess.add(root);
 		while (!nodesToProcess.isEmpty()) {
 			Anode anode = nodesToProcess.remove(0);
-			System.out.println("  Processing " + anode);
 			Node n = anode.node;
 			for (Iterator<Edge> iter = edgeSet.iterator(); iter.hasNext();) {
 				Edge e = iter.next();
@@ -46,10 +47,8 @@ public class Arranger {
 						Anode a = new Anode(dst, anode.depth + 1);
 						nodeMap.put(dst, a);
 						nodesToProcess.add(a);
-						System.out.println("     Adding a child: " + a);
 						anode.children.add(new Aedge(e, anode, a));
 					} else {
-						System.out.println("     Adding a backlink: " + nodeMap.get(dst));
 						anode.backlinks.add(new Aedge(e, anode, nodeMap.get(dst)));
 					}
 				}
@@ -58,8 +57,7 @@ public class Arranger {
 	}
 
 	public boolean arrange() {
-		System.out.println("arrange() invoked! root=" + root);
-		int midpointX = root.node.getX() + root.node.getWidth()/2;
+		int midpointX = root.node.getX() + root.node.getWidth() / 2;
 		boolean modified = arrangeChildren(root, midpointX, root.node.getY());
 		modified |= fixEdges(root);
 		return modified;
@@ -77,6 +75,7 @@ public class Arranger {
 					e.edge.setFromSide(Edge.Side.bottom);
 					e.edge.setToSide(Edge.Side.top);
 				}
+				nodesToProcess.add(e.to);
 			}
 			if (!node.backlinks.isEmpty()) {
 				int nodeCenter = node.node.getX() + (node.node.getWidth() / 2);
@@ -112,34 +111,44 @@ public class Arranger {
 	 * @return
 	 */
 	public boolean arrangeChildren(Anode node, int x, int y) {
-		System.out.println("Arranging the children of node " + node + ", located at " + x + ", " + y);
 		boolean modified = false;
 		Point[] dims = node.getAggregateDims();
-		System.out.println("   Dims:");
-		for (int i = 0; i < dims.length; i++) {
-			System.out.println("   " + i + ":\t" + dims[i]);
-		}
 		int boxWidth = dims[0].x;
 		int oldX = node.node.getX();
 		int oldY = node.node.getY();
 		int newX = x - node.node.getWidth() / 2;
 		int newY = y;
 		modified = (oldX != newX || oldY != newY);
-		System.out.println("  Changing x from " + oldX + " to " + newX);
-		System.out.println("  Changing y from " + oldY + " to " + newY);
 		node.node.setX(newX);
 		node.node.setY(newY);
 		int nextY = y + node.node.getHeight() + ROW_SEPARATION;
-		int nextX = x - boxWidth/2;
+		int nextX = x - boxWidth / 2;
 		int index = 0;
+		sortNodesLeftToRight(node.children);
 		for (Aedge e : node.children) {
-			System.out.println("  For the child, nextX=" + nextX + " and nextY=" + nextY);
 			Anode child = e.to;
 			index += 1;
-			modified |= arrangeChildren(child, nextX + dims[index].x/2, nextY);
+			modified |= arrangeChildren(child, nextX + dims[index].x / 2, nextY);
 			nextX += COL_SEPARATION + dims[index].x;
 		}
 		return modified;
+	}
+
+	private static final Comparator<Aedge> leftToRight = new Comparator<>() {
+
+		@Override
+		public int compare(Aedge o1, Aedge o2) {
+			return Integer.compare(o1.to.node.getX(), o2.to.node.getX());
+		}
+	};
+
+	private void sortNodesLeftToRight(List<Aedge> children) {
+		SortedSet<Aedge> sorted = new TreeSet<Aedge>(leftToRight);
+		sorted.addAll(children);
+		children.clear();
+		for(Aedge ae : sorted) {
+			children.add(ae);
+		}
 	}
 
 	private static class Anode {
@@ -204,7 +213,6 @@ public class Arranger {
 			edge = e;
 			from = src;
 			to = dst;
-			System.out.println("Created " + this);
 		}
 
 		public String toString() {

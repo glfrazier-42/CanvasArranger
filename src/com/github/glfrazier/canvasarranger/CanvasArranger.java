@@ -3,19 +3,18 @@ package com.github.glfrazier.canvasarranger;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.Reader;
 import java.io.StringReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import javax.json.Json;
 import javax.json.JsonArray;
@@ -72,7 +71,7 @@ public class CanvasArranger implements Runnable {
 				JsonObject content = reader.readObject();
 				reader.close();
 				in.close();
-		
+
 				JsonArray nodeList = content.getJsonArray("nodes");
 				parseNodeList(nodeList);
 				JsonArray edgeList = content.getJsonArray("edges");
@@ -143,7 +142,7 @@ public class CanvasArranger implements Runnable {
 //		out.close();
 //		Path srcPath = tmpfile.toPath();
 		Path dstPath = canvasFile.toPath();
-		Files.write( dstPath, buffer);
+		Files.write(dstPath, buffer);
 //		tmpfile.delete();
 	}
 
@@ -242,7 +241,6 @@ public class CanvasArranger implements Runnable {
 						System.exit(-1);
 					}
 					arranger = new Arranger(nodes.get(rootNodeID), nodes, edges);
-					System.out.println("Constructed the arranger.");
 				}
 				if (arranger != null) {
 					modified |= arranger.arrange();
@@ -263,6 +261,8 @@ public class CanvasArranger implements Runnable {
 
 	}
 
+	private static final Pattern COMMAND_PATTERN = Pattern.compile("^\\<ca(.*)\\>\\s*$");
+
 	private boolean processCommands() {
 		boolean modified = false;
 		boolean repaintAnnotations = false;
@@ -272,41 +272,47 @@ public class CanvasArranger implements Runnable {
 		for (Iterator<String> iter = nodes.keySet().iterator(); iter.hasNext();) {
 			String id = iter.next();
 			Node n = nodes.get(id);
-			if (n.isCard() && n.getText().startsWith("<ca") && n.getText().endsWith(">")) {
-				modified = true;
-				repaintAnnotations = true;
-				boolean remove = true;
-				String s = n.getText().substring("<ca".length(), n.getText().length() - 1);
-				System.out.println("Commands = <" + s + ">");
-				Reader reader = new StringReader(s);
-				try {
-					cmds.load(reader);
-					System.out.println("Number of cmds: " + cmds.size());
-				} catch (IOException e) {
-					cmds.clear();
-					n.setText("Failed to parse commands: " + s);
-					remove = false;
-				}
-
-				System.out.println("show_annotations is either here or not here...");
-				if (cmds.containsKey("show_annotations")) {
-					System.out.println("show_annotations is here!");
-					showAnnotations = cmds.getBooleanProperty("show_annotations");
-					if (showAnnotations) {
-						System.out.println("And it is true");
-						annotationsNode = n;
+			if (n.isCard()) {
+				Matcher matcher = COMMAND_PATTERN.matcher(n.getText());
+				if (matcher.matches()) {
+					System.out.println("Pattern matched for " + n);
+					modified = true;
+					repaintAnnotations = true;
+					boolean remove = true;
+					String s = matcher.group(1);
+					System.out.println("Commands = <" + s + ">");
+					Reader reader = new StringReader(s);
+					try {
+						cmds.load(reader);
+						System.out.println("Number of cmds: " + cmds.size());
+					} catch (IOException e) {
+						cmds.clear();
+						n.setText("Failed to parse commands: " + s);
 						remove = false;
 					}
-				} else {
-					System.out.println("show_annotations is not present.");
-				}
-				if (cmds.getBooleanProperty("exit", false)) {
-					pendingExit = true;
-				}
 
-				if (remove) {
-					iter.remove();
-					nodeOrdering.remove(id);
+					System.out.println("show_annotations is either here or not here...");
+					if (cmds.containsKey("show_annotations")) {
+						System.out.println("show_annotations is here!");
+						showAnnotations = cmds.getBooleanProperty("show_annotations");
+						if (showAnnotations) {
+							System.out.println("And it is true");
+							annotationsNode = n;
+							remove = false;
+						}
+					} else {
+						System.out.println("show_annotations is not present.");
+					}
+					if (cmds.getBooleanProperty("exit", false)) {
+						pendingExit = true;
+					}
+
+					if (remove) {
+						iter.remove();
+						nodeOrdering.remove(id);
+					}
+				} else {
+					System.out.println("pattern did not match.");
 				}
 			}
 		}
